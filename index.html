@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AWS MLA-C01 문제풀이</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mut:#6b7280;--bd:#d9dde3;--ok:#16a34a;--okbg:#dcfce7;--no:#dc2626;--nobg:#fee2e2;--hint:#f59e0b;--hintbg:#fef3c7;--pri:#2563eb}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1216;--card:#181c22;--tx:#e8eaed;--mut:#9aa3af;--bd:#2d333b;--ok:#4ade80;--okbg:#12361f;--no:#f87171;--nobg:#3d1717;--hint:#fbbf24;--hintbg:#3b2e0a;--pri:#60a5fa}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.6 -apple-system,"Noto Sans KR","Malgun Gothic",sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:12px}
+header{position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:5}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;font-size:14px;color:var(--mut)}
+.prog{height:6px;background:var(--bd);border-radius:3px;margin-top:6px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--pri);width:0}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-top:10px}
+.qno{font-weight:700;color:var(--pri);margin-bottom:6px}
+.q{white-space:pre-wrap;margin-bottom:14px}
+.tag{display:inline-block;font-size:12px;background:var(--hintbg);color:var(--hint);border-radius:6px;padding:1px 8px;margin-left:6px}
+.opt{display:flex;gap:10px;width:100%;text-align:left;background:var(--card);color:var(--tx);border:1.5px solid var(--bd);border-radius:10px;padding:10px 12px;margin:8px 0;font:inherit;cursor:pointer}
+.opt b{flex:none;width:1.5em}
+.opt.sel{border-color:var(--pri);background:rgba(37,99,235,.1)}
+.opt.correct{border-color:var(--ok);background:var(--okbg)}
+.opt.wrong{border-color:var(--no);background:var(--nobg)}
+.opt.missed{border-color:var(--hint);background:var(--hintbg);border-style:dashed;box-shadow:0 0 0 2px var(--hint) inset}
+.opt:disabled{cursor:default;opacity:1}
+.res{margin-top:12px;padding:10px 12px;border-radius:10px;font-weight:600}
+.res.ok{background:var(--okbg);color:var(--ok)}.res.no{background:var(--nobg);color:var(--no)}
+.legend{font-size:13px;color:var(--mut);margin-top:6px}
+details{margin-top:10px;font-size:14px;color:var(--mut)}
+details div{margin-top:6px;white-space:pre-wrap}
+.nav{display:flex;gap:8px;margin-top:12px}
+button.b{flex:1;padding:12px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font:inherit;font-weight:600;cursor:pointer}
+button.p{background:var(--pri);color:#fff;border-color:var(--pri)}
+button:disabled.b{opacity:.4}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.tools input{width:90px;padding:8px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font:inherit}
+.tools button{padding:8px 10px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="bar"><span id="pos"></span><span id="score"></span></div>
+  <div class="prog"><i id="pg"></i></div>
+  <div class="tools">
+    <input id="jump" type="number" min="1" placeholder="번호">
+    <button class="b" id="go">이동</button>
+    <button class="b" id="mode">순서대로</button>
+    <button class="b" id="wrongOnly">오답만 보기</button>
+    <button class="b" id="reset">기록 초기화</button>
+  </div>
+</header>
+<div class="card" id="card">불러오는 중…</div>
+<div class="nav"><button class="b" id="prev">← 이전</button><button class="b p" id="next">다음 →</button></div>
+<div class="legend">초록: 정답 · 빨강: 내가 고른 오답 · 주황 점선: 놓친 정답</div>
+</div>
+<script>
+const KEY="mla-c01-kr-v1";
+let Q=[],list=[],idx=0,sel=new Set(),done=false,random=false,wrongOnly=false;
+let st=load();
+function load(){try{return JSON.parse(localStorage.getItem(KEY))||{r:{}}}catch(e){return{r:{}}}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}}
+const $=id=>document.getElementById(id);
+fetch("questions.json").then(r=>r.json()).then(d=>{Q=d;build();show()});
+function build(){
+  let base=Q.filter(q=>!wrongOnly||st.r[q.n]===0);
+  if(!base.length){base=Q;wrongOnly=false;$("wrongOnly").textContent="오답만 보기"}
+  list=base.slice();
+  if(random)for(let i=list.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[list[i],list[j]]=[list[j],list[i]]}
+  idx=Math.min(idx,list.length-1)
+}
+function stats(){const v=Object.values(st.r);return{t:v.length,c:v.filter(x=>x===1).length}}
+function show(){
+  const q=list[idx];sel=new Set();done=false;
+  const multi=q.a.length>1;
+  let h=`<div class="qno">문제 ${q.n}${multi?`<span class="tag">${q.a.length}개 선택</span>`:""}</div><div class="q"></div><div id="opts"></div><div id="out"></div>`;
+  $("card").innerHTML=h;
+  $("card").querySelector(".q").textContent=q.q;
+  const box=$("opts");
+  q.o.forEach((t,i)=>{
+    const L="ABCDEF"[i],b=document.createElement("button");
+    b.className="opt";b.dataset.l=L;
+    b.innerHTML=`<b>${L}.</b><span></span>`;b.lastChild.textContent=t;
+    b.onclick=()=>pick(L);box.appendChild(b)
+  });
+  if(multi){const s=document.createElement("button");s.className="b p";s.id="submit";s.style.marginTop="8px";s.style.width="100%";s.textContent="정답 확인";s.disabled=true;s.onclick=grade;box.after(s)}
+  meta();window.scrollTo(0,0)
+}
+function meta(){
+  const s=stats();
+  $("pos").textContent=`${idx+1} / ${list.length}${wrongOnly?" (오답)":""}`;
+  $("score").textContent=`정답 ${s.c} / 풀이 ${s.t} (${s.t?Math.round(s.c/s.t*100):0}%)`;
+  $("pg").style.width=(s.t/Q.length*100)+"%";
+  $("prev").disabled=idx===0;$("next").disabled=idx===list.length-1
+}
+function pick(L){
+  if(done)return;const q=list[idx];
+  if(q.a.length===1){sel=new Set([L]);grade();return}
+  sel.has(L)?sel.delete(L):sel.add(L);
+  document.querySelectorAll(".opt").forEach(b=>b.classList.toggle("sel",sel.has(b.dataset.l)));
+  $("submit").disabled=sel.size!==q.a.length
+}
+function grade(){
+  const q=list[idx];done=true;
+  const ok=sel.size===q.a.length&&q.a.every(a=>sel.has(a));
+  document.querySelectorAll(".opt").forEach(b=>{
+    const L=b.dataset.l;b.disabled=true;b.classList.remove("sel");
+    const isA=q.a.includes(L),isS=sel.has(L);
+    if(isA&&isS)b.classList.add("correct");
+    else if(isS)b.classList.add("wrong");
+    else if(isA)b.classList.add("missed")
+  });
+  const sb=$("submit");if(sb)sb.remove();
+  st.r[q.n]=ok?1:0;save();
+  $("out").innerHTML=`<div class="res ${ok?"ok":"no"}">${ok?"정답입니다! 🎉":"오답입니다."} 정답: ${q.a.join(", ")}</div>`+
+   (q.e?`<details><summary>해설 (영문)</summary><div></div></details>`:"");
+  if(q.e)$("out").querySelector("details div").textContent=q.e;
+  meta()
+}
+$("prev").onclick=()=>{if(idx>0){idx--;show()}};
+$("next").onclick=()=>{if(idx<list.length-1){idx++;show()}};
+$("go").onclick=()=>{const n=+$("jump").value;const i=list.findIndex(q=>q.n===n);if(i>=0){idx=i;show()}else alert("현재 목록에 없는 번호입니다.")};
+$("mode").onclick=()=>{random=!random;$("mode").textContent=random?"랜덤":"순서대로";idx=0;build();show()};
+$("wrongOnly").onclick=()=>{wrongOnly=!wrongOnly;$("wrongOnly").textContent=wrongOnly?"전체 보기":"오답만 보기";idx=0;build();show()};
+$("reset").onclick=()=>{if(confirm("풀이 기록을 모두 지울까요?")){st={r:{}};save();wrongOnly=false;build();show()}};
+document.addEventListener("keydown",e=>{if(e.target.tagName==="INPUT")return;if(e.key==="ArrowRight")$("next").click();if(e.key==="ArrowLeft")$("prev").click()});
+</script>
+</body>
+</html>
